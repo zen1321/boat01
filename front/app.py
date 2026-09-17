@@ -69,26 +69,24 @@ weather_info = {
 st.markdown("---")
 
 # ------------------------------------------------------------------------------
-# 2. 縦14項目 × 6艇 のデータ一括コピペ & 表編集エリア
+# 2. 縦13項目 × 6艇 のデータ一括コピペ & 表編集エリア
 # ------------------------------------------------------------------------------
 index_items = [
-    "艇番号",  # 0
-    "登録番号",  # 1
-    "名前",  # 2
-    "ランク",  # 3
-    "期&出身地",  # 4
-    "2連対率",  # 5
-    "今期",  # 6
-    "全国",  # 7
-    "当地",  # 8
-    "展示",  # 9
-    "周回",  # 10
-    "周り足",  # 11
-    "直線",  # 12
-    "ST",  # 13
+    "艇番号",  # 0行目 (項目名なしで読み込み)
+    "登録番号",  # 1行目 (項目名なしで読み込み)
+    "名前",  # 2行目 (項目名なしで読み込み)
+    "ランク",  # 3行目 (項目名なしで読み込み)
+    "2連対率",  # 4行目 (ここから項目名あり/なし両対応)
+    "今期",  # 5行目
+    "全国",  # 6行目
+    "当地",  # 7行目
+    "展示",  # 8行目
+    "周回",  # 9行目
+    "周り足",  # 10行目
+    "直線",  # 11行目
+    "ST",  # 12行目
 ]
 columns = [f"{i+1}号艇" for i in range(6)]
-
 # セッション状態の保持
 if "grid_df" not in st.session_state:
     st.session_state.grid_df = pd.DataFrame(
@@ -122,42 +120,55 @@ raw_text = st.text_area(
 col_btn1, col_btn2, col_btn3, _ = st.columns([2, 2, 2, 4])
 
 with col_btn1:
+# --- 「📥 表に反映する」ボタンの解析処理 ---
     if st.button("📥 表に反映する", type="primary", use_container_width=True):
         if raw_text.strip():
             try:
-                parsed_df = pd.read_csv(
-                    io.StringIO(raw_text.strip()),
-                    sep=r"\s+",
-                    header=None,
-                    dtype=str,
-                )
+                import re
 
-                for r in range(len(parsed_df)):
-                    row_data = parsed_df.iloc[r].dropna().tolist()
-                    if not row_data:
+                # 1. 改行で分割し、空行を除外
+                lines = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
+
+                for r, line in enumerate(lines):
+                    # タブまたはスペースで要素を分割
+                    row_values = [v.strip() for v in re.split(r"\s+", line) if v.strip()]
+
+                    if not row_values:
                         continue
 
-                    first_val = str(row_data[0]).strip()
+                    first_val = row_values[0]
 
-                    if first_val in index_items:
-                        target_row_idx = index_items.index(first_val)
-                        raw_values = row_data[1:]
+                    # --- 行の位置（target_row_idx）の特定 ---
+                    # A. 0～3行目（艇番号、登録番号、名前、ランク）は上からの行番号で割り当て
+                    if r < 4:
+                        target_row_idx = r
+                        # 項目名が含まれていれば除外、値だけならそのまま
+                        clean_values = row_values[1:] if first_val in index_items else row_values
+
+                    # B. 4行目以降（2連対率～ST）は項目名判定（無ければ順に割り当て）
                     else:
-                        start_default = index_items.index("2連対率")
-                        target_row_idx = start_default + r
-                        raw_values = row_data
+                        if first_val in index_items:
+                            target_row_idx = index_items.index(first_val)
+                            clean_values = row_values[1:]  # 項目名を除外
+                        else:
+                            start_default = index_items.index("2連対率")
+                            target_row_idx = start_default + (r - 4)
+                            clean_values = row_values
 
+                    # --- セッション状態の表（grid_df）へ格納 ---
                     if target_row_idx < len(index_items):
-                        cols_to_copy = min(len(raw_values), 6)
+                        cols_to_copy = min(len(clean_values), 6)
                         for c in range(cols_to_copy):
-                            val_str = str(raw_values[c]).strip()
+                            val_str = str(clean_values[c]).strip()
+
+                            # データ成形（% 除去 & .10 → 0.10 補正）
                             clean_val = val_str.replace("%", "").replace("％", "")
                             if clean_val.startswith("."):
                                 clean_val = "0" + clean_val
 
                             st.session_state.grid_df.iloc[target_row_idx, c] = clean_val
 
-                st.success("表に反映しました！")
+                st.success("艇番号を含む13項目のデータをズレなく反映しました！")
                 st.rerun()
             except Exception as e:
                 st.error(f"データの解析に失敗しました: {e}")
