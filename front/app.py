@@ -192,55 +192,7 @@ edited_df = st.data_editor(
 st.session_state.grid_df = edited_df
 
 # ------------------------------------------------------------------------------
-# 3. 入力データからの抽出＆データ整形（分析ロジック受け渡し用）
-# ------------------------------------------------------------------------------
-racers_data = []
-exhibition_data = []
-
-
-def safe_float(val, default=0.0):
-    try:
-        return float(val) if str(val).strip() != "" else default
-    except (ValueError, TypeError):
-        return default
-
-
-for pit_no in range(1, 7):
-    col_name = f"{pit_no}号艇"
-    col_data = edited_df[col_name]
-
-    r_id = str(col_data.get("登録番号", "")).strip() or f"400{pit_no}"
-    r_name = str(col_data.get("名前", "")).strip() or f"選手{pit_no}"
-    r_rank = str(col_data.get("ランク", "")).strip() or "B1"
-
-    racers_data.append(
-        {
-            "pit_no": pit_no,
-            "entry_course": pit_no,
-            "racer_id": r_id,
-            "racer_name": r_name,
-            "rank": r_rank,
-            "motor_rate": safe_float(col_data.get("2連対率"), 30.0),
-            "avg_st": safe_float(col_data.get("今期"), 0.15),
-            "national_win_rate": safe_float(col_data.get("全国"), 5.0),
-            "local_win_rate": safe_float(col_data.get("当地"), 5.0),
-        }
-    )
-
-    exhibition_data.append(
-        {
-            "pit_no": pit_no,
-            "entry_course": pit_no,
-            "exhibition_time": safe_float(col_data.get("展示"), 6.70),
-            "lap_time": safe_float(col_data.get("周回"), 37.0),
-            "turn_foot": safe_float(col_data.get("周り足"), 1.5),
-            "straight_line": safe_float(col_data.get("直線"), 1.5),
-            "exhibition_st": safe_float(col_data.get("ST"), 0.15),
-        }
-    )
-
-# ------------------------------------------------------------------------------
-# 4. 進入コース設定
+# 4. 進入コース設定（データ抽出の前に設定を取得）
 # ------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("#### 🧭 進入コース設定")
@@ -260,9 +212,58 @@ for i, col in enumerate(course_cols):
         )
         updated_courses.append(chosen_course)
 
-for i in range(len(racers_data)):
-    racers_data[i]["entry_course"] = updated_courses[i]
-    exhibition_data[i]["entry_course"] = updated_courses[i]
+# ------------------------------------------------------------------------------
+# 3. 入力データからの抽出＆データ整形（進入コースに応じた自動紐付け）
+# ------------------------------------------------------------------------------
+def safe_float(val, default=0.0):
+    try:
+        return float(val) if str(val).strip() != "" else default
+    except (ValueError, TypeError):
+        return default
+racers_data = []
+exhibition_data = []
+
+for pit_no in range(1, 7):
+    # 枠番順（1〜6号艇の列）から前半データを取得
+    col_name = f"{pit_no}号艇"
+    col_data = edited_df[col_name]
+
+    r_id = str(col_data.get("登録番号", "")).strip() or f"400{pit_no}"
+    r_name = str(col_data.get("名前", "")).strip() or f"選手{pit_no}"
+    r_rank = str(col_data.get("ランク", "")).strip() or "B1"
+
+    # 対象艇の進入コースを取得（例：2号艇が3コースに入った場合は chosen_course = 3）
+    chosen_course = updated_courses[pit_no - 1]
+    
+    # 「展示〜ST」は進入順に並んでいるため、進入コースの列（chosen_course号艇の列）から取得
+    ex_col_name = f"{chosen_course}号艇"
+    ex_col_data = edited_df[ex_col_name]
+
+    racers_data.append(
+        {
+            "pit_no": pit_no,
+            "entry_course": chosen_course,
+            "racer_id": r_id,
+            "racer_name": r_name,
+            "rank": r_rank,
+            "motor_rate": safe_float(col_data.get("2連対率"), 30.0),
+            "avg_st": safe_float(col_data.get("今期"), 0.15),
+            "national_win_rate": safe_float(col_data.get("全国"), 5.0),
+            "local_win_rate": safe_float(col_data.get("当地"), 5.0),
+        }
+    )
+
+    exhibition_data.append(
+        {
+            "pit_no": pit_no,
+            "entry_course": chosen_course,
+            "exhibition_time": safe_float(ex_col_data.get("展示"), 6.70),
+            "lap_time": safe_float(ex_col_data.get("周回"), 37.0),
+            "turn_foot": safe_float(ex_col_data.get("周り足"), 1.5),
+            "straight_line": safe_float(ex_col_data.get("直線"), 1.5),
+            "exhibition_st": safe_float(ex_col_data.get("ST"), 0.15),
+        }
+    )
 
 # ------------------------------------------------------------------------------
 # 5. 予測実行 & 結果表示
