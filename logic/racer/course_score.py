@@ -1,5 +1,4 @@
-from data.racer_repository import get_venue_course_score_from_db
-
+from data.venue_repository import get_course_score
 
 def calculate_course_score(course: int, venue: str = "平和島") -> float:
     """進入コースと競艇場名からコース別成績スコアを算出
@@ -8,4 +7,5 @@ def calculate_course_score(course: int, venue: str = "平和島") -> float:
     :param venue: 競艇場名 (例: '平和島')
     :return: コース別スコア (float)
     """
-    return get_venue_course_score_from_db(venue, course)
+    # DBではなく JSON 読み込み関数（get_course_score）を呼び出す
+    return get_course_score(venue_name=venue, course_no=course)

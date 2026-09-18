@@ -1,72 +1,49 @@
-import os
-import sqlite3
-from typing import List
+import json
+from pathlib import Path
+from typing import Any, Dict, List
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "boat_race.db")
-
-# フォールバック用の24競艇場リスト
-DEFAULT_VENUES = [
-#     "桐生",
-#     "戸田",
-#     "江戸川",
-#     "平和島",
-#     "多摩川",
-#     "浜名湖",
-#     "蒲郡",
-#     "常滑",
-#     "津",
-#     "三国",
-#     "びわこ",
-#     "住之江",
-#     "尼崎",
-#     "鳴門",
-#     "丸亀",
-#     "児島",
-#     "宮島",
-#     "徳山",
-#     "下関",
-#     "若松",
-#     "芦屋",
-#     "福岡",
-#     "唐津",
-#     "大村",
-]
+# JSONファイルのパス設定 (data_json/venue_types.json)
+JSON_PATH = (
+    Path(__file__).resolve().parent.parent / "data_json" / "venue_types.json"
+)
 
 
-def get_all_venues(db_path: str = DB_PATH) -> List[str]:
-    """venue_types テーブルから競艇場名一覧を取得する
+def _load_venue_types() -> Dict[str, Any]:
+    """JSONファイルから競艇場タイプデータを読み込む"""
+    if not JSON_PATH.exists():
+        return {}
+    with open(JSON_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-    :param db_path: データベースファイルのパス
-    :return: 競艇場名のリスト
-    """
-    if not os.path.exists(db_path):
-        return DEFAULT_VENUES
 
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+def get_all_venues() -> List[str]:
+    """全競艇場名のリストを取得（画面選択用）"""
+    data = _load_venue_types()
+    return list(data.keys())
 
-        # venue_types テーブルから venue_name を取得
-        cursor.execute(
-            "SELECT venue_name FROM venue_types"
-        )
-        rows = cursor.fetchall()
-        conn.close()
 
-        if rows:
-            return [row[0] for row in rows]
-        return DEFAULT_VENUES
+def get_venue_type_info(venue_name: str) -> Dict[str, Any]:
+    """競艇場名から設定データを取得"""
+    data = _load_venue_types()
 
-    except sqlite3.Error:
-        # カラム名等が異なる場合のフォールバック（nameやid指定等）
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM venue_types")
-            rows = cursor.fetchall()
-            conn.close()
-            if rows:
-                return [row[0] for row in rows]
-        except Exception:
-            pass
-        return DEFAULT_VENUES
+    # 該当する場があれば返し、なければ標準のデフォルト値を返す
+    if venue_name in data:
+        return data[venue_name]
+
+    return {
+        "venue_type": "標準",
+        "water_type": "静水",
+        "course1_score": 3.0,
+        "course2_score": 1.5,
+        "course3_score": 1.5,
+        "course4_score": 1.0,
+        "course5_score": 0.5,
+        "course6_score": 0.0,
+    }
+
+
+def get_course_score(venue_name: str, course_no: int) -> float:
+    """指定した競艇場・コース番号のスコア補正値を取得"""
+    info = get_venue_type_info(venue_name)
+    key = f"course{course_no}_score"
+    return float(info.get(key, 0.0))

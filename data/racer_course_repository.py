@@ -1,68 +1,107 @@
+import json
 import os
-import sqlite3
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Union
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "boat_race.db")
+# JSONファイルのパス設定（fan2604.json）
+JSON_PATH = Path(__file__).resolve().parent.parent / "data_json" / "fan2604.json"
+
+# パフォーマンス向上のため、JSONデータをキャッシュ保持
+_racers_cache: Dict[str, Dict[str, Any]] = {}
+
+
+def _safe_int(val: Any, default: int = 0) -> int:
+    """文字列（例: '030', ' 005 ' 等）を安全に数値型(int)に変換する"""
+    if val is None:
+        return default
+    try:
+        s_val = str(val).strip()
+        return int(s_val) if s_val else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _load_racers_data(json_path: Union[str, Path] = JSON_PATH) -> Dict[str, Dict[str, Any]]:
+    """JSONファイルを読み込んで登番(toban)をキーにした辞書を作成・キャッシュする"""
+    global _racers_cache
+    if _racers_cache:
+        return _racers_cache
+
+    target_path = Path(json_path)
+
+    if not target_path.exists():
+        print(f"警告: 選手データファイルが見つかりません: {target_path}")
+        return {}
+
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            # 登番(toban)をキーとして辞書化
+            _racers_cache = {str(item.get("toban", "")).strip(): item for item in data}
+    except Exception as e:
+        print(f"JSON読み込みエラー: {e}")
+        _racers_cache = {}
+
+    return _racers_cache
 
 
 def get_racer_course_stat(
-    racer_id: int, course_no: int, db_path: str = DB_PATH
+    racer_id: str, course_no: int, json_path: Union[str, Path] = JSON_PATH
 ) -> Dict[str, Any]:
-    """登番と進入コース番号から選手のコース成績を取得し、各着率を計算する"""
+    """
+    登番(racer_id)と進入コース番号(course_no)から選手データを参照し、
+    各着率(1着率, 2着率, 3着率)および3連対率(%)を計算して返却する。
+    """
     default_res = {
         "entry_count": 0,
-        "avg_st": 0.0,
         "win_1st_rate": 0.0,
         "win_2nd_rate": 0.0,
         "win_3rd_rate": 0.0,
         "win_3in_rate": 0.0,
     }
 
-    if not os.path.exists(db_path):
+    racers = _load_racers_data(json_path)
+    racer_key = str(racer_id).strip()
+
+    if racer_key not in racers:
+        return default_res
+
+    racer = racers[racer_key]
+    c_num = int(course_no)
+
+    if c_num < 1 or c_num > 6:
         return default_res
 
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        # コースごとの進入回数および各着数を数値型(int)へ安全にキャストして取得
+        entry_count = _safe_int(racer.get(f"c{c_num}_entries"))
+        c_1st = _safe_int(racer.get(f"c{c_num}_1st_places"))
+        c_2nd = _safe_int(racer.get(f"c{c_num}_2nd_places"))
+        c_3rd = _safe_int(racer.get(f"c{c_num}_3rd_places"))
 
-        query = """
-            SELECT entry_count, avg_st, win_1st, win_2nd, win_3rd, win_4th, win_5th, win_6th
-            FROM racer_course_stats
-            WHERE racer_id = ? AND course_no = ?
-        """
-        cursor.execute(query, (int(racer_id), int(course_no)))
-        row = cursor.fetchone()
-        conn.close()
+        # 動作確認用デバッグログ
+        print(f"DEBUG [登番:{racer_key} コース:{c_num}]: 進入回数={entry_count}, 1着={c_1st}, 2着={c_2nd}, 3着={c_3rd}")
 
-        if row:
-            entry_count = row[0] or 0
-            avg_st = row[1] if row[1] is not None else 0.0
-            win_1st = row[2] or 0
-            win_2nd = row[3] or 0
-            win_3rd = row[4] or 0
+        if entry_count > 0:
+            # 各着率および3連対率の算出（パーセンテージ表記）
+            win_1st_rate = round((c_1st / entry_count) * 100, 2)
+            win_2nd_rate = round((c_2nd / entry_count) * 100, 2)
+            win_3rd_rate = round((c_3rd / entry_count) * 100, 2)
+            win_3in_rate = round(((c_1st + c_2nd + c_3rd) / entry_count) * 100, 2)
+        else:
+            win_1st_rate = 0.0
+            win_2nd_rate = 0.0
+            win_3rd_rate = 0.0
+            win_3in_rate = 0.0
 
-            if entry_count > 0:
-                win_1st_rate = (win_1st / entry_count) * 100
-                win_2nd_rate = (win_2nd / entry_count) * 100
-                win_3rd_rate = (win_3rd / entry_count) * 100
-                win_3in_rate = ((win_1st + win_2nd + win_3rd) / entry_count) * 100
-            else:
-                win_1st_rate = 0.0
-                win_2nd_rate = 0.0
-                win_3rd_rate = 0.0
-                win_3in_rate = 0.0
-
-            return {
-                "entry_count": entry_count,
-                "avg_st": avg_st,
-                "win_1st_rate": win_1st_rate,
-                "win_2nd_rate": win_2nd_rate,
-                "win_3rd_rate": win_3rd_rate,
-                "win_3in_rate": win_3in_rate,
-            }
-
-        return default_res
+        return {
+            "entry_count": entry_count,
+            "win_1st_rate": win_1st_rate,
+            "win_2nd_rate": win_2nd_rate,
+            "win_3rd_rate": win_3rd_rate,
+            "win_3in_rate": win_3in_rate,
+        }
 
     except Exception as e:
-        print(f"racer_course_stats データ取得エラー: {e}")
+        print(f"コース成績計算エラー (登番: {racer_id}, コース: {course_no}): {e}")
         return default_res

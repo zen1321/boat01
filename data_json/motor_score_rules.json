@@ -1,0 +1,44 @@
+{
+  "標準": [
+    {
+      "min_rate": 40,
+      "score": 2.0
+    },
+    {
+      "min_rate": 30,
+      "score": 1.0
+    },
+    {
+      "min_rate": 0,
+      "score": -1.0
+    }
+  ],
+  "機力重視": [
+    {
+      "min_rate": 40,
+      "score": 3.0
+    },
+    {
+      "min_rate": 30,
+      "score": 1.5
+    },
+    {
+      "min_rate": 0,
+      "score": -1.5
+    }
+  ],
+  "インコース重視": [
+    {
+      "min_rate": 40,
+      "score": 1.4
+    },
+    {
+      "min_rate": 30,
+      "score": 0.7
+    },
+    {
+      "min_rate": 0,
+      "score": -0.7
+    }
+  ]
+}

@@ -1,103 +1,74 @@
+import json
+from pathlib import Path
 from data.db_connector import get_connection
 
+# パス設定
+RANK_JSON_PATH = (
+    Path(__file__).resolve().parent.parent / "data_json" / "rank_scores.json"
+)
+MOTOR_JSON_PATH = (
+    Path(__file__).resolve().parent.parent / "data_json" / "motor_score_rules.json"
+)
 
-##rank_scoresから階級スコアを取得
+
+def _load_rank_scores() -> dict:
+    if not RANK_JSON_PATH.exists():
+        return {"A1": 1.5, "A2": 1.0, "B1": 0.0, "B2": -1.0}
+    with open(RANK_JSON_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _load_motor_score_rules() -> dict:
+    """motor_score_rules.json からデータを読み込む"""
+    if not MOTOR_JSON_PATH.exists():
+        return {}
+    with open(MOTOR_JSON_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+## rank_scoresから階級スコアを取得
 def get_rank_score_from_db(rank: str) -> float:
-    conn = get_connection()
-    cursor = conn.cursor()
-
+    scores = _load_rank_scores()
     normalized_rank = str(rank).strip().upper()
-    cursor.execute(
-        "SELECT score FROM rank_scores WHERE rank = ?", (normalized_rank,)
-    )
-    row = cursor.fetchone()
-    conn.close()
+    return float(scores.get(normalized_rank, 0.0))
 
-    if row:
-        return float(row["score"])
-    return 0.0  # 未定義・見つからない場合は0.0点
 
-##venue_typeから競艇場タイプを取得
+## venue_typeから競艇場タイプを取得
 def get_venue_type_from_db(venue_name: str) -> str:
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT venue_type FROM venue_types WHERE venue_name = ?", (venue_name,)
-    )
-    row = cursor.fetchone()
-    conn.close()
+    # 先ほど作成した venue_repository から競艇場タイプを取得するよう統合可能
+    from data.venue_repository import get_venue_type_info
+    info = get_venue_type_info(venue_name)
+    return info.get("venue_type", "標準")
 
-    if row:
-        return row["venue_type"]
-    return "標準"  # 登録がない場合はデフォルト「標準」
 
-##motor_score_rulesから2連対立のスコアを取得
+## motor_score_rulesから2連対率のスコアを取得（JSON読み込みへ移行）
 def get_motor_score_from_db(motor_2in_rate: float, venue_type: str) -> float:
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # 該当タイプのルールを threshold (min_rate) 降順で取得
-    cursor.execute(
-        """
-        SELECT min_rate, score FROM motor_score_rules
-        WHERE venue_type = ?
-        ORDER BY min_rate DESC
-    """,
-        (venue_type,),
-    )
-    rules = cursor.fetchall()
-    conn.close()
+    rules_data = _load_motor_score_rules()
+    rules = rules_data.get(venue_type, [])
 
     if not rules:
-        # ルールが存在しない場合のバックアップ処理
         return 0.0
 
-    # 高いしきい値から判定
-    for rule in rules:
+    # min_rate が高い順にソートして判定
+    sorted_rules = sorted(rules, key=lambda x: x["min_rate"], reverse=True)
+    for rule in sorted_rules:
         if motor_2in_rate >= float(rule["min_rate"]):
             return float(rule["score"])
 
     return 0.0
 
+
 ##
 def get_water_type_from_db(venue_name: str) -> str:
-    """venue_types テーブルから競艇場の水面タイプ（静水 / 難水）を取得"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT water_type FROM venue_types WHERE venue_name = ?",
-        (venue_name,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+    from data.venue_repository import get_venue_type_info
+    info = get_venue_type_info(venue_name)
+    return info.get("water_type", "静水")
 
-    if row and row["water_type"]:
-        return row["water_type"]
-    return "静水"  # 未登録時のデフォルト
 
 ##
 def get_venue_course_score_from_db(venue_name: str, course: int) -> float:
-    """競艇場名と進入コース（1~6）に応じたコース基準スコアをDBから取得"""
-    if not (1 <= course <= 6):
-        return 0.0
-
-    column_name = f"course{course}_score"
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        f"SELECT {column_name} FROM venue_types WHERE venue_name = ?",
-        (venue_name,),
-    )
-    row = cursor.fetchone()
-    conn.close()
-
-    if row and row[column_name] is not None:
-        return float(row[column_name])
-
-    # 標準のデフォルト値
-    default_scores = {1: 3.0, 2: 2.0, 3: 1.0, 4: 0.5, 5: -1.0, 6: -2.0}
-    return default_scores.get(course, 0.0)
+    from data.venue_repository import get_course_score
+    return get_course_score(venue_name, course)
 
 
 ##
