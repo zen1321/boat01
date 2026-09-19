@@ -28,7 +28,7 @@ def _safe_float_val(val: Any, default: float = 0.0) -> float:
 
 
 def calculate_racer_total_score(
-    racer_id: int,
+    racer_id: Any,
     national_win_rate: float,
     local_win_rate: float,
     motor_rate: float,
@@ -38,7 +38,7 @@ def calculate_racer_total_score(
     rank: str = None,
 ) -> Dict[str, Any]:
     """選手情報に関する基本スコア（小計）を集計する"""
-    if rank is None:
+    if rank is None or not str(rank).strip():
         racer_info = get_racer_by_id(racer_id)
         rank = racer_info.get("rank", "B1") if racer_info else "B1"
 
