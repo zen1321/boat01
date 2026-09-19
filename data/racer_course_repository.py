@@ -45,6 +45,41 @@ def _load_racers_data(json_path: Union[str, Path] = JSON_PATH) -> Dict[str, Dict
     return _racers_cache
 
 
+def get_racer_basic_info(racer_id: str, json_path: Union[str, Path] = JSON_PATH) -> Dict[str, str]:
+    """
+    登番(racer_id)から選手データ(fan2604.json)を参照し、
+    名前(漢字)、ランク、今期平均STを取得して返す。
+    """
+    default_res = {"name": "", "rank": "", "st_avg": ""}
+    
+    racers = _load_racers_data(json_path)
+    racer_key = str(racer_id).strip()
+
+    if racer_key not in racers:
+        return default_res
+
+    racer = racers[racer_key]
+    
+    # 名前の取得（全角スペース等を整形）
+    raw_name = str(racer.get("name_kanji", "")).replace("\u3000", " ").strip()
+    
+    # ランクの取得 (例: A1, B1)
+    rank = str(racer.get("rank", "")).strip()
+    
+    # 今期平均STの取得・フォーマット (例: "021" -> "0.21")
+    raw_st = str(racer.get("st_avg", "")).strip()
+    st_avg = ""
+    if raw_st.isdigit():
+        st_val = float(raw_st) / 100.0
+        st_avg = f"{st_val:.2f}"
+
+    return {
+        "name": raw_name,
+        "rank": rank,
+        "st_avg": st_avg,
+    }
+
+
 def get_racer_course_stat(
     racer_id: str, course_no: int, json_path: Union[str, Path] = JSON_PATH
 ) -> Dict[str, Any]:
@@ -79,7 +114,6 @@ def get_racer_course_stat(
         c_2nd = _safe_int(racer.get(f"c{c_num}_2nd_places"))
         c_3rd = _safe_int(racer.get(f"c{c_num}_3rd_places"))
 
-        # 動作確認用デバッグログ
         print(f"DEBUG [登番:{racer_key} コース:{c_num}]: 進入回数={entry_count}, 1着={c_1st}, 2着={c_2nd}, 3着={c_3rd}")
 
         if entry_count > 0:

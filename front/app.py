@@ -10,7 +10,7 @@ if str(project_root) not in sys.path:
 
 import pandas as pd
 import streamlit as st
-from data.racer_course_repository import get_racer_course_stat
+from data.racer_course_repository import get_racer_course_stat, get_racer_basic_info
 from data.venue_repository import get_all_venues
 from logic.betting_decision import generate_final_betting_recommendation
 from logic.main_logic import calculate_full_race_scores
@@ -41,17 +41,15 @@ with col_top2:
     st.markdown("##### 🌬️ 風条件")
     wind_direction = st.selectbox("風向", ["無風", "追い風", "向かい風"], index=0)
 
-    # 風向に応じた風速の初期値（デフォルト値）の設定
     default_wind_speed = 0.0 if wind_direction == "無風" else 5.0
 
-    # 1.0 刻み（step=1.0）に変更し、風向選択に連動した key を設定
     wind_speed = st.number_input(
         "風速 (m)",
         min_value=0.0,
         max_value=15.0,
         value=default_wind_speed,
-        step=1.0,  # ← 1.0刻みに変更
-        key=f"wind_speed_input_{wind_direction}",  # 風向が変わった際に初期値を再適用するためのキー
+        step=1.0,
+        key=f"wind_speed_input_{wind_direction}",
     )
 
 with col_top3:
@@ -69,25 +67,24 @@ weather_info = {
 st.markdown("---")
 
 # ------------------------------------------------------------------------------
-# 2. 縦13項目 × 6艇 のデータ一括コピペ & 表編集エリア
+# 2. 縦12項目 × 6艇 のデータ一括コピペ & 表編集エリア
 # ------------------------------------------------------------------------------
 index_items = [
-    "艇番号",  # 0行目 (項目名なしで読み込み)
-    "登録番号",  # 1行目 (項目名なしで読み込み)
-    "名前",  # 2行目 (項目名なしで読み込み)
-    "ランク",  # 3行目 (項目名なしで読み込み)
-    "2連対率",  # 4行目 (ここから項目名あり/なし両対応)
-    "今期",  # 5行目
-    "全国",  # 6行目
-    "当地",  # 7行目
-    "展示",  # 8行目
-    "周回",  # 9行目
-    "周り足",  # 10行目
-    "直線",  # 11行目
-    "ST",  # 12行目
+    "登録番号",  # 0行目
+    "名前",      # 1行目
+    "ランク",    # 2行目
+    "2連対率",  # 3行目
+    "今期",      # 4行目 (今期ST)
+    "全国",      # 5行目
+    "当地",      # 6行目
+    "展示",      # 7行目
+    "周回",      # 8行目
+    "周り足",    # 9行目
+    "直線",      # 10行目
+    "ST",        # 11行目
 ]
 columns = [f"{i+1}号艇" for i in range(6)]
-# セッション状態の保持
+
 if "grid_df" not in st.session_state:
     st.session_state.grid_df = pd.DataFrame(
         "", index=index_items, columns=columns, dtype=object
@@ -120,40 +117,34 @@ raw_text = st.text_area(
 col_btn1, col_btn2, col_btn3, _ = st.columns([2, 2, 2, 4])
 
 with col_btn1:
-# --- 「📥 表に反映する」ボタンの解析処理 ---
     if st.button("📥 表に反映する", type="primary", use_container_width=True):
         if raw_text.strip():
             try:
                 import re
 
-                # 1. 改行で分割し、空行を除外
                 lines = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
 
+                # 入力行ごとの解析
                 for r, line in enumerate(lines):
-                    # タブまたはスペースで要素を分割
                     row_values = [v.strip() for v in re.split(r"\s+", line) if v.strip()]
-
                     if not row_values:
                         continue
 
                     first_val = row_values[0]
 
-                    # --- 行の位置（target_row_idx）の特定 ---
-                    # A. 0～3行目（艇番号、登録番号、名前、ランク）は上からの行番号で割り当て
-                    if r < 4:
-                        target_row_idx = r
-                        # 項目名が含まれていれば除外、値だけならそのまま
-                        clean_values = row_values[1:] if first_val in index_items else row_values
-
-                    # B. 4行目以降（2連対率～ST）は項目名判定（無ければ順に割り当て）
+                    # --- 行位置（target_row_idx）の特定ロジック修正 ---
+                    if first_val in index_items:
+                        # 先頭文字が項目名（例：「2連対率」「全国」）に一致する場合
+                        target_row_idx = index_items.index(first_val)
+                        clean_values = row_values[1:]  # 項目名を除外
                     else:
-                        if first_val in index_items:
-                            target_row_idx = index_items.index(first_val)
-                            clean_values = row_values[1:]  # 項目名を除外
+                        # 先頭文字が項目名でない場合（例：数字のみの登録番号行）
+                        if r == 0:
+                            target_row_idx = index_items.index("登録番号")
                         else:
-                            start_default = index_items.index("2連対率")
-                            target_row_idx = start_default + (r - 4)
-                            clean_values = row_values
+                            # 万が一項目名のないデータ行が続いた場合のフォールバック
+                            target_row_idx = min(r, len(index_items) - 1)
+                        clean_values = row_values
 
                     # --- セッション状態の表（grid_df）へ格納 ---
                     if target_row_idx < len(index_items):
@@ -161,14 +152,37 @@ with col_btn1:
                         for c in range(cols_to_copy):
                             val_str = str(clean_values[c]).strip()
 
-                            # データ成形（% 除去 & .10 → 0.10 補正）
-                            clean_val = val_str.replace("%", "").replace("％", "")
+                            # データ整形（%, F., . 補正）
+                            clean_val = (
+                                val_str.replace("%", "")
+                                .replace("％", "")
+                                .replace("F.", "0.")
+                                .replace("f.", "0.")
+                                .replace("L.", "0.")
+                            )
                             if clean_val.startswith("."):
                                 clean_val = "0" + clean_val
 
                             st.session_state.grid_df.iloc[target_row_idx, c] = clean_val
 
-                st.success("艇番号を含む13項目のデータをズレなく反映しました！")
+                # --- 登録番号をキーにして「名前」「ランク」「今期ST」をJSONから自動補完 ---
+                toban_row_idx = index_items.index("登録番号")
+                name_row_idx = index_items.index("名前")
+                rank_row_idx = index_items.index("ランク")
+                st_row_idx = index_items.index("今期")
+
+                for c in range(6):
+                    toban_val = str(st.session_state.grid_df.iloc[toban_row_idx, c]).strip()
+                    if toban_val:
+                        info = get_racer_basic_info(toban_val)
+                        if info["name"]:
+                            st.session_state.grid_df.iloc[name_row_idx, c] = info["name"]
+                        if info["rank"]:
+                            st.session_state.grid_df.iloc[rank_row_idx, c] = info["rank"]
+                        if info["st_avg"]:
+                            st.session_state.grid_df.iloc[st_row_idx, c] = info["st_avg"]
+
+                st.success("データを反映し、登番から選手情報（名前・ランク・今期ST）を補完しました！")
                 st.rerun()
             except Exception as e:
                 st.error(f"データの解析に失敗しました: {e}")
@@ -192,7 +206,7 @@ edited_df = st.data_editor(
 st.session_state.grid_df = edited_df
 
 # ------------------------------------------------------------------------------
-# 4. 進入コース設定（データ抽出の前に設定を取得）
+# 4. 進入コース設定
 # ------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("#### 🧭 進入コース設定")
@@ -213,18 +227,18 @@ for i, col in enumerate(course_cols):
         updated_courses.append(chosen_course)
 
 # ------------------------------------------------------------------------------
-# 3. 入力データからの抽出＆データ整形（進入コースに応じた自動紐付け）
+# 3. 入力データからの抽出＆データ整形
 # ------------------------------------------------------------------------------
 def safe_float(val, default=0.0):
     try:
         return float(val) if str(val).strip() != "" else default
     except (ValueError, TypeError):
         return default
+
 racers_data = []
 exhibition_data = []
 
 for pit_no in range(1, 7):
-    # 枠番順（1〜6号艇の列）から前半データを取得
     col_name = f"{pit_no}号艇"
     col_data = edited_df[col_name]
 
@@ -232,10 +246,8 @@ for pit_no in range(1, 7):
     r_name = str(col_data.get("名前", "")).strip() or f"選手{pit_no}"
     r_rank = str(col_data.get("ランク", "")).strip() or "B1"
 
-    # 対象艇の進入コースを取得（例：2号艇が3コースに入った場合は chosen_course = 3）
     chosen_course = updated_courses[pit_no - 1]
     
-    # 「展示〜ST」は進入順に並んでいるため、進入コースの列（chosen_course号艇の列）から取得
     ex_col_name = f"{chosen_course}号艇"
     ex_col_data = edited_df[ex_col_name]
 
@@ -280,7 +292,6 @@ if st.button("🚀 レーススコア予測を実行", type="primary", use_conta
 
         st.success(f"【{selected_venue}】予測集計が完了しました！")
 
-        # 展開予想 ＆ 3連単推奨買い目
         st.subheader("🎫 展開予想 ＆ 3連単推奨買い目")
 
         bet_recommendation = generate_final_betting_recommendation(
@@ -317,7 +328,6 @@ if st.button("🚀 レーススコア予測を実行", type="primary", use_conta
 
         st.markdown("---")
 
-        # 総合評価一覧テーブル表示
         st.subheader("📊 総合評価一覧")
         table_rows = []
         for r in results:
@@ -345,7 +355,6 @@ if st.button("🚀 レーススコア予測を実行", type="primary", use_conta
         df_results = pd.DataFrame(table_rows)
         st.dataframe(df_results, use_container_width=True, hide_index=True)
 
-        # モーター・展示足ハイライト表示
         st.subheader("⚙️ モーター・展示足比較（上位3位ハイライト）")
 
         detail_rows = []
@@ -405,7 +414,6 @@ if st.button("🚀 レーススコア予測を実行", type="primary", use_conta
 
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
-        # 進入コース別実績
         st.subheader("🎯 進入コース別実績（勝率一覧）")
 
         course_stats_rows = []
