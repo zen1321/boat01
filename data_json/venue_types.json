@@ -1,64 +1,4 @@
 {
-  "びわこ": {
-    "venue_type": "標準",
-    "water_type": "静水",
-    "course1_score": 3.0,
-    "course2_score": 1.5,
-    "course3_score": 1.5,
-    "course4_score": 1.0,
-    "course5_score": 0.5,
-    "course6_score": 0.0
-  },
-  "下関": {
-    "venue_type": "インコース重視",
-    "water_type": "静水",
-    "course1_score": 5.5,
-    "course2_score": 2.0,
-    "course3_score": 1.5,
-    "course4_score": 0.5,
-    "course5_score": -1.0,
-    "course6_score": -2.0
-  },
-  "大村": {
-    "venue_type": "インコース重視",
-    "water_type": "静水",
-    "course1_score": 4.0,
-    "course2_score": 1.5,
-    "course3_score": 1.0,
-    "course4_score": 0.5,
-    "course5_score": -1.0,
-    "course6_score": -2.0
-  },
-  "平和島": {
-    "venue_type": "機力重視",
-    "water_type": "静水",
-    "course1_score": 3.0,
-    "course2_score": 2.0,
-    "course3_score": 1.5,
-    "course4_score": 1.5,
-    "course5_score": 0.5,
-    "course6_score": 0.0
-  },
-  "徳山": {
-    "venue_type": "インコース重視",
-    "water_type": "静水",
-    "course1_score": 4.5,
-    "course2_score": 2.0,
-    "course3_score": 1.0,
-    "course4_score": 0.5,
-    "course5_score": 0.0,
-    "course6_score": -1.0
-  },
-  "戸田": {
-    "venue_type": "機力重視",
-    "water_type": "静水",
-    "course1_score": 1.5,
-    "course2_score": 1.5,
-    "course3_score": 2.0,
-    "course4_score": 2.5,
-    "course5_score": 1.5,
-    "course6_score": 0.0
-  },
   "桐生": {
     "venue_type": "標準",
     "water_type": "静水",
@@ -69,34 +9,234 @@
     "course5_score": 0.0,
     "course6_score": 0.0
   },
+  "戸田": {
+    "venue_type": "機力重視",
+    "water_type": "難水",
+    "course1_score": 2.5,
+    "course2_score": 1.5,
+    "course3_score": 2.0,
+    "course4_score": 2.0,
+    "course5_score": 1.0,
+    "course6_score": 0.5
+  },
   "江戸川": {
     "venue_type": "機力重視",
+    "water_type": "難水",
+    "course1_score": 2.5,
+    "course2_score": 1.5,
+    "course3_score": 1.5,
+    "course4_score": 1.5,
+    "course5_score": 1.0,
+    "course6_score": 0.5
+  },
+  "平和島": {
+    "venue_type": "機力重視",
+    "water_type": "難水",
+    "course1_score": 2.5,
+    "course2_score": 1.5,
+    "course3_score": 2.0,
+    "course4_score": 2.0,
+    "course5_score": 1.0,
+    "course6_score": 0.5
+  },
+  "多摩川": {
+    "venue_type": "標準",
     "water_type": "静水",
-    "course1_score": 1.0,
-    "course2_score": 0.5,
-    "course3_score": 0.5,
-    "course4_score": 0.5,
+    "course1_score": 3.5,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.5,
     "course5_score": 0.5,
     "course6_score": 0.0
   },
-  "若松": {
+  "浜名湖": {
     "venue_type": "標準",
     "water_type": "静水",
+    "course1_score": 3.5,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.5,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "蒲郡": {
+    "venue_type": "標準",
+    "water_type": "静水",
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "常滑": {
+    "venue_type": "標準",
+    "water_type": "静水",
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "津": {
+    "venue_type": "標準",
+    "water_type": "標準",
+    "course1_score": 3.5,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.5,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "三国": {
+    "venue_type": "標準",
+    "water_type": "標準",
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "びわこ": {
+    "venue_type": "機力重視",
+    "water_type": "難水",
+    "course1_score": 2.5,
+    "course2_score": 1.5,
+    "course3_score": 2.0,
+    "course4_score": 2.0,
+    "course5_score": 1.0,
+    "course6_score": 0.5
+  },
+  "住之江": {
+    "venue_type": "インコース重視",
+    "water_type": "静水",
+    "course1_score": 4.5,
+    "course2_score": 2.0,
+    "course3_score": 1.0,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "尼崎": {
+    "venue_type": "標準",
+    "water_type": "静水",
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "鳴門": {
+    "venue_type": "機力重視",
+    "water_type": "難水",
     "course1_score": 3.0,
+    "course2_score": 1.5,
+    "course3_score": 2.0,
+    "course4_score": 1.5,
+    "course5_score": 1.0,
+    "course6_score": 0.5
+  },
+  "丸亀": {
+    "venue_type": "標準",
+    "water_type": "静水",
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "児島": {
+    "venue_type": "標準",
+    "water_type": "静水",
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "宮島": {
+    "venue_type": "標準",
+    "water_type": "難水",
+    "course1_score": 3.5,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.5,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "徳山": {
+    "venue_type": "インコース重視",
+    "water_type": "静水",
+    "course1_score": 5.0,
     "course2_score": 2.0,
     "course3_score": 1.0,
     "course4_score": 0.5,
     "course5_score": 0.0,
     "course6_score": 0.0
   },
-  "鳴門": {
+  "下関": {
+    "venue_type": "インコース重視",
+    "water_type": "静水",
+    "course1_score": 4.5,
+    "course2_score": 2.0,
+    "course3_score": 1.0,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "若松": {
+    "venue_type": "インコース重視",
+    "water_type": "静水",
+    "course1_score": 4.5,
+    "course2_score": 2.0,
+    "course3_score": 1.0,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "芦屋": {
+    "venue_type": "インコース重視",
+    "water_type": "静水",
+    "course1_score": 5.0,
+    "course2_score": 2.0,
+    "course3_score": 1.0,
+    "course4_score": 0.5,
+    "course5_score": 0.0,
+    "course6_score": 0.0
+  },
+  "福岡": {
+    "venue_type": "機力重視",
+    "water_type": "難水",
+    "course1_score": 3.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.5,
+    "course5_score": 1.0,
+    "course6_score": 0.5
+  },
+  "唐津": {
     "venue_type": "標準",
     "water_type": "静水",
-    "course1_score": 1.5,
-    "course2_score": 1.5,
-    "course3_score": 2.0,
-    "course4_score": 2.5,
-    "course5_score": 1.5,
+    "course1_score": 4.0,
+    "course2_score": 2.0,
+    "course3_score": 1.5,
+    "course4_score": 1.0,
+    "course5_score": 0.5,
+    "course6_score": 0.0
+  },
+  "大村": {
+    "venue_type": "インコース重視",
+    "water_type": "静水",
+    "course1_score": 5.0,
+    "course2_score": 2.0,
+    "course3_score": 1.0,
+    "course4_score": 0.5,
+    "course5_score": 0.0,
     "course6_score": 0.0
   }
 }
