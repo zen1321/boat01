@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # プロジェクトルートを Python パスに追加
 project_root = Path(__file__).resolve().parent.parent.parent
@@ -327,6 +328,19 @@ if parsed_data and "event" in parsed_data and "venues" in parsed_data["event"]:
                 st.dataframe(df, use_container_width=True, hide_index=True)
 
                 # コピペ欄（メイン予測画面に貼り付け可能なフォーマット）
+                # st.markdown("#### 📋 データコピペ欄")
+                # st.caption("1行目: 登番（項目名なし） / 2行目: 2連対率 / 3行目: 全国 / 4行目: 当地（タブ区切り）")
+
+                # copy_rows = [
+                #     "\t".join(reg_nos),
+                #     "2連対率\t" + "\t".join(motor_2nds),
+                #     "全国\t" + "\t".join(national_wins),
+                #     "当地\t" + "\t".join(local_wins)
+                # ]
+                # formatted_copy_text = "\n".join(copy_rows)
+
+                # st.text_area("以下をコピーしてご利用ください", value=formatted_copy_text, height=140)
+
                 st.markdown("#### 📋 データコピペ欄")
                 st.caption("1行目: 登番（項目名なし） / 2行目: 2連対率 / 3行目: 全国 / 4行目: 当地（タブ区切り）")
 
@@ -338,7 +352,50 @@ if parsed_data and "event" in parsed_data and "venues" in parsed_data["event"]:
                 ]
                 formatted_copy_text = "\n".join(copy_rows)
 
-                st.text_area("以下をコピーしてご利用ください", value=formatted_copy_text, height=140)
+                st.text_area("以下をコピーしてご利用ください", value=formatted_copy_text, height=140, key="copy_text_area")
 
+                # --- クリップボードコピーボタン（JavaScript連携） ---
+                # JSON文字列として安全にJavaScriptへ埋め込み
+                js_copy_text = json.dumps(formatted_copy_text)
+
+                copy_button_html = f"""
+                <div style="margin-top: 5px;">
+                    <button id="copyBtn" style="
+                        background-color: #FF4B4B;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        font-size: 14px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        width: 100%;
+                        font-weight: bold;
+                        transition: background-color 0.3s;
+                    ">
+                        📋 テキストをクリップボードにコピー
+                    </button>
+                </div>
+
+                <script>
+                    document.getElementById('copyBtn').addEventListener('click', function() {{
+                        const textToCopy = {js_copy_text};
+                        navigator.clipboard.writeText(textToCopy).then(function() {{
+                            const btn = document.getElementById('copyBtn');
+                            btn.innerText = '✅ コピー完了！';
+                            btn.style.backgroundColor = '#2e7d32';
+                            setTimeout(function() {{
+                                btn.innerText = '📋 テキストをクリップボードにコピー';
+                                btn.style.backgroundColor = '#FF4B4B';
+                            }}, 2000);
+                        }}).catch(function(err) {{
+                            alert('コピーに失敗しました: ' + err);
+                        }});
+                    }});
+                </script>
+                """
+
+                # HTMLコンポーネントを埋め込み
+                components.html(copy_button_html, height=50)
+                
             else:
                 st.info("このレースの出走選手データがありません。")
