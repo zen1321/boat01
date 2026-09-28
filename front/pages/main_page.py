@@ -1,3 +1,5 @@
+import io
+import os
 import sys
 from pathlib import Path
 
@@ -6,17 +8,14 @@ project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-import io
-import os
 import pandas as pd
 import streamlit as st
-from data.racer_course_repository import get_racer_course_stat, get_racer_basic_info
+from data.racer_course_repository import get_racer_basic_info, get_racer_course_stat
 from data.venue_repository import get_all_venues
 from logic.betting_decision import generate_final_betting_recommendation
 from logic.main_logic import calculate_full_race_scores
 
 # --- タイトル ＆ 新画面への遷移ボタン ---
-# （main_page.py の冒頭部分）
 st.title("🚤 ボートレース総合スコア予測")
 
 col_head1, col_head2 = st.columns([7, 3])
@@ -31,208 +30,180 @@ st.markdown("---")
 # ------------------------------------------------------------------------------
 # 1. 画面上部設定: 競艇場 & 気象条件
 # ------------------------------------------------------------------------------
-st.subheader("⚙️ レース基本設定 & 気象条件")
+st.subheader("1. 開催情報・気象条件")
 
-col_top1, col_top2, col_top3 = st.columns(3)
+venues_data = get_all_venues()
+venue_names = list(venues_data.keys())
 
-with col_top1:
-    st.markdown("##### 📍 競艇場選択")
-    venue_list = get_all_venues()
-    default_index = venue_list.index("大村") if "大村" in venue_list else 0
-    selected_venue = st.selectbox("競艇場", venue_list, index=default_index)
+col1, col2, col3, col4, col5 = st.columns([2, 1.5, 1.5, 2, 2])
 
-with col_top2:
-    st.markdown("##### 🌬️ 風条件")
-    wind_direction = st.selectbox("風向", ["無風", "追い風", "向かい風"], index=0)
+with col1:
+    selected_venue = st.selectbox("競艇場", venue_names, index=0)
 
-    default_wind_speed = 0.0 if wind_direction == "無風" else 5.0
+with col2:
+    wind_direction = st.selectbox(
+        "風向", ["追い風", "向かい風", "左横風", "右横風", "無風"], index=0
+    )
 
+with col3:
     wind_speed = st.number_input(
-        "風速 (m)",
-        min_value=0.0,
-        max_value=15.0,
-        value=default_wind_speed,
-        step=1.0,
-        key=f"wind_speed_input_{wind_direction}",
+        "風速 (m)", min_value=0.0, max_value=15.0, value=2.0, step=0.5
     )
 
-with col_top3:
-    st.markdown("##### 🌊 潮条件")
-    tide_state = st.selectbox(
-        "潮の状態", ["なし", "満潮", "干潮", "中潮", "小潮"], index=0
+with col4:
+    tide_condition = st.selectbox(
+        "潮目", ["中潮", "大潮", "小潮", "長潮", "若潮"], index=0
     )
 
-weather_info = {
-    "wind_direction": wind_direction,
-    "wind_speed": wind_speed,
-    "tide_state": tide_state,
-}
+with col5:
+    wave_height = st.number_input(
+        "波高 (cm)", min_value=0.0, max_value=30.0, value=2.0, step=1.0
+    )
 
 st.markdown("---")
 
 # ------------------------------------------------------------------------------
-# 2. 縦12項目 × 6艇 のデータ一括コピペ & 表編集エリア
+# 2. 直前データコピペ & エディタ反映エリア
 # ------------------------------------------------------------------------------
+st.subheader("2. 直前データ・コース進入設定")
+
+# 初期データフレームの構築 (6艇 x 11項目)
 index_items = [
-    "登録番号",  # 0行目
-    "名前",      # 1行目
-    "ランク",    # 2行目
-    "2連対率",  # 3行目
-    "今期",      # 4行目
-    "全国",      # 5行目
-    "当地",      # 6行目
-    "展示",      # 7行目
-    "周回",      # 8行目
-    "周り足",    # 9行目
-    "直線",      # 10行目
-    "ST",        # 11行目
+    "登録番号",
+    "名前",
+    "ランク",
+    "今期",
+    "2連対率",
+    "全国",
+    "当地",
+    "展示",
+    "周回",
+    "ST",
+    "チルト",
 ]
-columns = [f"{i+1}号艇" for i in range(6)]
+default_cols = [f"{i}号艇" for i in range(1, 7)]
 
 if "grid_df" not in st.session_state:
     st.session_state.grid_df = pd.DataFrame(
-        "", index=index_items, columns=columns, dtype=object
+        "", index=index_items, columns=default_cols
     )
 
-if "input_text" not in st.session_state:
-    st.session_state.input_text = ""
+col_text, col_ctrl = st.columns([6, 4])
 
-
-def clear_text():
-    st.session_state.input_text = ""
-
-
-def reset_grid():
-    st.session_state.grid_df = pd.DataFrame(
-        "", index=index_items, columns=columns, dtype=object
+with col_text:
+    pasted_text = st.text_area(
+        "コピペ欄 (タブ区切りテキスト)",
+        height=140,
+        placeholder="例:\n4001\t4002\t4003\t4004\t4005\t4006\n2連対率\t35.2\t40.1\t28.5\t50.0\t31.0\t42.3",
     )
 
+with col_ctrl:
+    target_row_label = st.selectbox("反映先項目", index_items, index=0)
+    col_b1, col_b2 = st.columns(2)
 
-st.subheader("📋 1. Webサイトからのデータ貼り付け")
+    with col_b1:
+        if st.button("📥 表に反映する", use_container_width=True):
+            if pasted_text.strip():
+                lines = [
+                    line.strip()
+                    for line in pasted_text.strip().split("\n")
+                    if line.strip()
+                ]
 
-raw_text = st.text_area(
-    label="コピペ用エリア",
-    key="input_text",
-    height=120,
-    placeholder="例:\nST\t.18\t.01\t.15\t.22\t.16\t.18",
-    label_visibility="collapsed",
-)
+                # 選択された項目インデックスを取得
+                target_row_idx = index_items.index(target_row_label)
 
-col_btn1, col_btn2, col_btn3, _ = st.columns([2, 2, 2, 4])
+                for line in lines:
+                    if target_row_idx >= len(index_items):
+                        break
 
-with col_btn1:
-    if st.button("📥 表に反映する", type="primary", use_container_width=True):
-        if raw_text.strip():
-            try:
-                import re
+                    # タブまたは連続スペースで分割
+                    values = [
+                        v.strip()
+                        for v in line.replace("\t", " ").split(" ")
+                        if v.strip()
+                    ]
 
-                lines = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
+                    # 項目名が先頭に含まれている場合は除去
+                    clean_values = []
+                    for val in values:
+                        if val in index_items or val in ["2連対率", "全国", "当地"]:
+                            continue
+                        clean_values.append(val)
 
-                for r, line in enumerate(lines):
-                    row_values = [v.strip() for v in re.split(r"\s+", line) if v.strip()]
-
-                    if not row_values:
-                        continue
-
-                    first_val = row_values[0]
-
-                    if first_val in index_items:
-                        target_row_idx = index_items.index(first_val)
-                        clean_values = row_values[1:]
-                    else:
-                        if r == 0:
-                            target_row_idx = index_items.index("登録番号")
-                        else:
-                            target_row_idx = min(r, len(index_items) - 1)
-                        clean_values = row_values
-
-                    if target_row_idx < len(index_items):
+                    if clean_values:
                         cols_to_copy = min(len(clean_values), 6)
                         for c in range(cols_to_copy):
                             val_str = str(clean_values[c]).strip()
 
-                            clean_val = (
-                                val_str.replace("%", "")
-                                .replace("％", "")
-                                .replace("F.", "0.")
-                                .replace("f.", "0.")
-                                .replace("L.", "0.")
-                            )
+                            # パーセント記号の削除
+                            clean_val = val_str.replace("%", "").replace("％", "")
+
+                            # --- 【修正箇所①】 ST行のフライング(F)判定処理 ---
+                            if index_items[target_row_idx] == "ST":
+                                if clean_val.startswith(("F.", "f.")):
+                                    clean_val = "-" + clean_val[2:]
+                                elif clean_val.startswith(("F", "f")) and len(clean_val) > 1:
+                                    clean_val = "-" + clean_val[1:]
+                                elif clean_val.startswith(("L.", "l.")):
+                                    clean_val = "0.0"  # 出遅れ(L)は欠損/0扱い
+                            else:
+                                clean_val = clean_val.replace("F.", "0.").replace("f.", "0.").replace("L.", "0.")
+
                             if clean_val.startswith("."):
                                 clean_val = "0" + clean_val
+                            elif clean_val.startswith("-."):
+                                clean_val = "-0" + clean_val[2:]
 
                             st.session_state.grid_df.iloc[target_row_idx, c] = clean_val
 
-                # 選手基本情報の補完
-                toban_row_idx = index_items.index("登録番号")
-                name_row_idx = index_items.index("名前")
-                rank_row_idx = index_items.index("ランク")
-                st_row_idx = index_items.index("今期")
+                        target_row_idx += 1
 
-                for c in range(6):
-                    toban_val = str(st.session_state.grid_df.iloc[toban_row_idx, c]).strip()
-                    if toban_val:
-                        info = get_racer_basic_info(toban_val)
-                        if info["name"]:
-                            st.session_state.grid_df.iloc[name_row_idx, c] = info["name"]
-                        if info["rank"]:
-                            st.session_state.grid_df.iloc[rank_row_idx, c] = info["rank"]
-                        if info["st_avg"]:
-                            st.session_state.grid_df.iloc[st_row_idx, c] = info["st_avg"]
+                st.success("指定項目から順に反映しました！")
+            else:
+                st.warning("テキストが入力されていません。")
 
-                st.success("データを反映し、登番から選手情報（名前・ランク・今期ST）を補完しました！")
-                st.rerun()
-            except Exception as e:
-                st.error(f"データの解析に失敗しました: {e}")
-        else:
-            st.warning("テキストエリアにデータが入力されていません。")
+    with col_b2:
+        if st.button("🗑️ クリア", use_container_width=True):
+            st.session_state.grid_df = pd.DataFrame(
+                "", index=index_items, columns=default_cols
+            )
+            st.rerun()
 
-with col_btn2:
-    st.button("🧹 エリアをクリア", use_container_width=True, on_click=clear_text)
-
-with col_btn3:
-    st.button("🗑️ 表をリセット", use_container_width=True, on_click=reset_grid)
-
-st.subheader("2. データ確認・微調整")
-
+# 編集可能なデータエディタの表示
 edited_df = st.data_editor(
-    st.session_state.grid_df,
-    num_rows="fixed",
-    use_container_width=True,
-    key="boat_editor",
+    st.session_state.grid_df, use_container_width=True, height=420
 )
-st.session_state.grid_df = edited_df
 
-# ------------------------------------------------------------------------------
-# 4. 進入コース設定
-# ------------------------------------------------------------------------------
-st.markdown("---")
-st.markdown("#### 🧭 進入コース設定")
-st.caption("前付け等のコース変動がある場合は各艇の進入コースを変更してください（初期値は枠番通り）。")
-
-course_cols = st.columns(6)
+st.markdown("#### 進入コース設定")
+c_cols = st.columns(6)
 updated_courses = []
-
-for i, col in enumerate(course_cols):
-    pit_no = i + 1
-    with col:
-        chosen_course = st.selectbox(
-            f"{pit_no}号艇 コース",
+for i in range(1, 7):
+    with c_cols[i - 1]:
+        c_val = st.selectbox(
+            f"{i}号艇 進入",
             options=[1, 2, 3, 4, 5, 6],
-            index=pit_no - 1,
-            key=f"entry_course_pit_{pit_no}",
+            index=i - 1,
+            key=f"course_select_{i}",
         )
-        updated_courses.append(chosen_course)
+        updated_courses.append(c_val)
+
+st.markdown("---")
+
+
+# 安全な float 変換関数
+def safe_float(val, default=0.0):
+    try:
+        if val is None or str(val).strip() == "":
+            return default
+        return float(val)
+    except ValueError:
+        return default
+
 
 # ------------------------------------------------------------------------------
 # 3. 入力データからの抽出＆データ整形
 # ------------------------------------------------------------------------------
-def safe_float(val, default=0.0):
-    try:
-        return float(val) if str(val).strip() != "" else default
-    except (ValueError, TypeError):
-        return default
-
 racers_data = []
 exhibition_data = []
 
@@ -244,10 +215,14 @@ for pit_no in range(1, 7):
     r_name = str(col_data.get("名前", "")).strip() or f"選手{pit_no}"
     r_rank = str(col_data.get("ランク", "")).strip() or "B1"
 
+    # 進入コースに基づく直前データの参照
     chosen_course = updated_courses[pit_no - 1]
-    
     ex_col_name = f"{chosen_course}号艇"
     ex_col_data = edited_df[ex_col_name]
+
+    # --- 【修正箇所②】 展示STのフライング判定とフラグ保持 ---
+    raw_ex_st = safe_float(ex_col_data.get("ST"), 0.15)
+    is_f_flag = raw_ex_st < 0.0  # マイナス値の場合はフライングフラグをTrueに設定
 
     racers_data.append(
         {
@@ -271,203 +246,202 @@ for pit_no in range(1, 7):
             "lap_time": safe_float(ex_col_data.get("周回"), 37.0),
             "turn_foot": safe_float(ex_col_data.get("周り足"), 1.5),
             "straight_line": safe_float(ex_col_data.get("直線"), 1.5),
-            "exhibition_st": safe_float(ex_col_data.get("ST"), 0.15),
+            "exhibition_st": raw_ex_st,  # マイナス値を保持したまま引き渡す
+            "is_flying": is_f_flag,      # 明示的にフライングフラグを連携
         }
     )
 
 # ------------------------------------------------------------------------------
-# 5. 予測実行 & 結果表示
+# 4. 予測計算処理の実行
 # ------------------------------------------------------------------------------
-st.markdown("---")
-if st.button("🚀 レーススコア予測を実行", type="primary", use_container_width=True):
-    try:
-        results = calculate_full_race_scores(
-            venue_name=selected_venue,
-            race_racers_data=racers_data,
-            race_exhibition_data=exhibition_data,
-            weather_info=weather_info,
-        )
+if st.button("🚀 予測スコアを算出する", type="primary", use_container_width=True):
+    with st.spinner("各指標を計算中..."):
+        try:
+            results = calculate_full_race_scores(
+                venue_name=selected_venue,
+                wind_direction=wind_direction,
+                wind_speed_m=wind_speed,
+                tide_condition=tide_condition,
+                wave_height_cm=wave_height,
+                racers_data=racers_data,
+                exhibition_data=exhibition_data,
+            )
 
-        st.success(f"【{selected_venue}】予測集計が完了しました！")
+            # 結果データフレームの作成
+            res_rows = []
+            for r in results:
+                pit = r["pit_no"]
+                r_info = next(item for item in racers_data if item["pit_no"] == pit)
+                ex_info = next(
+                    item for item in exhibition_data if item["pit_no"] == pit
+                )
 
-        st.subheader("🎫 展開予想 ＆ 3連単推奨買い目")
+                bd = r["score_breakdown"]
+                dt = r["details"]
 
-        bet_recommendation = generate_final_betting_recommendation(
-            racer_scores=results,
-            race_racers_data=racers_data,
-            race_exhibition_data=exhibition_data,
-        )
+                res_rows.append(
+                    {
+                        "艇番": pit,
+                        "選手名": r_info["racer_name"],
+                        "進入": r["entry_course"],
+                        "総合スコア": r["total_score"],
+                        "選手素点": bd["racer_base_subtotal"],
+                        "展示タイム点": bd["exhibition_score"],
+                        "展示ST点": bd["exhibition_st_score"],
+                        "風点": bd["wind_score"],
+                        "潮点": bd["tide_score"],
+                        "展示順位": dt.get("exhibition_rank", "-"),
+                        "展示ST順位": dt.get("exhibition_st_rank", "-"),
+                    }
+                )
 
-        col_dev1, col_dev2, col_dev3 = st.columns(3)
-        with col_dev1:
-            st.metric(label="主展開予想", value=bet_recommendation["primary_development"])
-        with col_dev2:
-            st.metric(label="展開ランク", value=f"{bet_recommendation['development_rank']} ランク")
-        with col_dev3:
-            st.metric(label="総合信頼度", value=bet_recommendation["confidence"])
+            df_res = pd.DataFrame(res_rows)
+            df_res = df_res.sort_values(
+                by="総合スコア", ascending=False
+            ).reset_index(drop=True)
+            df_res.index = df_res.index + 1  # 予想順位 (1位〜)
 
-        st.info(f"💡 **買い目方針:** {bet_recommendation['betting_policy']}")
+            # ------------------------------------------------------------------
+            # 5. 結果表示: スコア一覧 & 買い目推奨
+            # ------------------------------------------------------------------
+            st.markdown("---")
+            st.subheader("3. 予測結果 & 買い目推奨")
 
-        col_bet1, col_bet2 = st.columns([1, 1])
+            col_res1, col_res2 = st.columns([6, 4])
 
-        with col_bet1:
-            st.markdown("##### 🎯 推奨買い目一覧")
-            bets_list = bet_recommendation.get("recommended_bets", [])
-            if bets_list:
-                df_bets = pd.DataFrame(bets_list)
-                df_bets.columns = ["買い目 (3連単)", "推奨配分 (比率 %)"]
-                st.dataframe(df_bets, use_container_width=True, hide_index=True)
-            else:
-                st.write("買い目データなし")
+            with col_res1:
+                st.markdown("#### 📊 予測スコア一覧")
 
-        with col_bet2:
-            with st.expander("🔍 展開ロジックの評価詳細を表示"):
-                st.json(bet_recommendation.get("development_details", {}))
+                # ヒートマップ風カラーリング
+                def color_scores(val):
+                    if isinstance(val, (int, float)):
+                        if val >= 15.0:
+                            return "background-color: #d1e7dd; color: #0f5132; font-weight: bold;"
+                        elif val >= 10.0:
+                            return "background-color: #fff3cd; color: #664d03;"
+                    return ""
 
-        st.markdown("---")
+                styled_df = df_res.style.applymap(
+                    color_scores, subset=["総合スコア"]
+                ).format(
+                    {
+                        "総合スコア": "{:.2f}",
+                        "選手素点": "{:.2f}",
+                        "展示タイム点": "{:.2f}",
+                        "展示ST点": "{:.2f}",
+                        "風点": "{:.2f}",
+                        "潮点": "{:.2f}",
+                    }
+                )
 
-        st.subheader("📊 総合評価一覧")
-        table_rows = []
-        for r in results:
-            sb = r["score_breakdown"]
-            rb = sb["racer_breakdown"]
-            table_rows.append(
+                st.dataframe(styled_df, use_container_width=True)
+
+            with col_res2:
+                st.markdown("#### 🎯 最終買い目推奨")
+
+                final_recommendation = generate_final_betting_recommendation(
+                    results
+                )
+
+                st.info(
+                    f"**本命買い目 (3連単)**:\n\n"
+                    f"### {final_recommendation.get('honmei', '1-2-3')}"
+                )
+
+                if "ana" in final_recommendation:
+                    st.warning(
+                        f"**穴・抑え買い目**:\n\n"
+                        f"### {final_recommendation['ana']}"
+                    )
+
+                if "reason" in final_recommendation:
+                    st.caption(f"判断理由: {final_recommendation['reason']}")
+
+            # ------------------------------------------------------------------
+            # 6. コース別過去成績（データリポジトリ連携）
+            # ------------------------------------------------------------------
+            st.markdown("---")
+            st.subheader("4. 出走選手のコース別実績（参考データ）")
+
+            course_stat_rows = []
+            for r_info in racers_data:
+                r_id = r_info["racer_id"]
+                course = r_info["entry_course"]
+
+                # 成績データおよび基本情報の取得
+                c_stat = get_racer_course_stat(r_id, course)
+                b_info = get_racer_basic_info(r_id)
+
+                if c_stat:
+                    course_stat_rows.append(
+                        {
+                            "艇番": r_info["pit_no"],
+                            "選手名": r_info["racer_name"],
+                            "進入": course,
+                            "出走回数": c_stat.get("run_count", 0),
+                            "1着率": c_stat.get("win_rate_1st", 0.0),
+                            "2着率": c_stat.get("win_rate_2nd", 0.0),
+                            "3着率": c_stat.get("win_rate_3rd", 0.0),
+                            "3連対率": c_stat.get("triple_rate", 0.0),
+                            "平均ST": c_stat.get("avg_st", 0.15),
+                        }
+                    )
+                else:
+                    course_stat_rows.append(
+                        {
+                            "艇番": r_info["pit_no"],
+                            "選手名": r_info["racer_name"],
+                            "進入": course,
+                            "出走回数": 0,
+                            "1着率": 0.0,
+                            "2着率": 0.0,
+                            "3着率": 0.0,
+                            "3連対率": 0.0,
+                            "平均ST": 0.15,
+                        }
+                    )
+
+            df_course_stats = pd.DataFrame(course_stat_rows)
+
+            def style_rates(df):
+                styles = pd.DataFrame("", index=df.index, columns=df.columns)
+                green_colors = [
+                    "background-color: #2e7d32; color: #ffffff; font-weight: bold;",
+                    "background-color: #4caf50; color: #ffffff; font-weight: bold;",
+                    "background-color: #81c784; color: #000000; font-weight: bold;",
+                    "background-color: #a5d6a7; color: #000000;",
+                    "background-color: #c8e6c9; color: #000000;",
+                    "background-color: #e8f5e9; color: #000000;",
+                ]
+
+                target_cols = ["1着率", "2着率", "3着率", "3連対率"]
+                for col in target_cols:
+                    if col in df.columns:
+                        unique_vals = sorted(
+                            df[col].dropna().unique(), reverse=True
+                        )
+                        for idx, val in df[col].items():
+                            if val in unique_vals:
+                                rank_idx = unique_vals.index(val)
+                                if rank_idx < len(green_colors):
+                                    styles.loc[idx, col] = green_colors[
+                                        rank_idx
+                                    ]
+
+                return styles
+
+            styled_course_df = df_course_stats.style.format(
                 {
-                    "予測順位": f"{r['predicted_rank']}位",
-                    "艇番": f"{r['pit_no']}号艇",
-                    "進入": f"{r['entry_course']}コース",
-                    "総合スコア": r["total_score"],
-                    "選手基本": sb["racer_base_subtotal"],
-                    "階級": rb.get("rank_score", 0),
-                    "勝率": rb.get("win_rate_score", 0),
-                    "モーター": rb.get("motor_score", 0),
-                    "平均ST": rb.get("avg_st_score", 0),
-                    "コース": rb.get("course_score", 0),
-                    "展示": sb["exhibition_score"],
-                    "展示ST": sb["exhibition_st_score"],
-                    "風": sb["wind_score"],
-                    "潮": sb["tide_score"],
+                    "1着率": "{:.1f}%",
+                    "2着率": "{:.1f}%",
+                    "3着率": "{:.1f}%",
+                    "3連対率": "{:.1f}%",
+                    "平均ST": "{:.2f}",
                 }
-            )
+            ).apply(style_rates, axis=None)
 
-        df_results = pd.DataFrame(table_rows)
-        st.dataframe(df_results, use_container_width=True, hide_index=True)
+            st.dataframe(styled_course_df, use_container_width=True)
 
-        st.subheader("⚙️ モーター・展示足比較（上位3位ハイライト）")
-
-        detail_rows = []
-        for r, ex in zip(racers_data, exhibition_data):
-            detail_rows.append(
-                {
-                    "艇番号": f"{r['pit_no']}号艇",
-                    "モータ2連対率": float(r["motor_rate"]),
-                    "展示タイム": float(ex["exhibition_time"]),
-                    "周回タイム": float(ex["lap_time"]),
-                    "回り足": float(ex["turn_foot"]),
-                    "直線": float(ex["straight_line"]),
-                }
-            )
-
-        df_detail = pd.DataFrame(detail_rows)
-
-        def highlight_top3(df: pd.DataFrame) -> pd.DataFrame:
-            styles = pd.DataFrame("", index=df.index, columns=df.columns)
-
-            color_1st = "background-color: #ffcdd2; color: #b71c1c; font-weight: bold;"
-            color_2nd = "background-color: #fff9c4; color: #826a00; font-weight: bold;"
-            color_3rd = "background-color: #c8e6c9; color: #1b5e20; font-weight: bold;"
-
-            ascending_rules = {
-                "モータ2連対率": False,
-                "展示タイム": True,
-                "周回タイム": True,
-                "回り足": True,
-                "直線": True,
-            }
-
-            for col, is_asc in ascending_rules.items():
-                if col in df.columns:
-                    unique_vals = sorted(df[col].dropna().unique(), reverse=not is_asc)
-                    for idx, val in df[col].items():
-                        if len(unique_vals) > 0 and val == unique_vals[0]:
-                            styles.loc[idx, col] = color_1st
-                        elif len(unique_vals) > 1 and val == unique_vals[1]:
-                            styles.loc[idx, col] = color_2nd
-                        elif len(unique_vals) > 2 and val == unique_vals[2]:
-                            styles.loc[idx, col] = color_3rd
-
-            return styles
-
-        styled_df = (
-            df_detail.style
-            .format({
-                "モータ2連対率": "{:.1f}",
-                "展示タイム": "{:.2f}",
-                "周回タイム": "{:.2f}",
-                "回り足": "{:.2f}",
-                "直線": "{:.2f}",
-            })
-            .apply(highlight_top3, axis=None)
-        )
-
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
-
-        st.subheader("🎯 進入コース別実績（勝率一覧）")
-
-        course_stats_rows = []
-        for r in racers_data:
-            stats = get_racer_course_stat(
-                racer_id=r["racer_id"],
-                course_no=r["entry_course"]
-            )
-            course_stats_rows.append(
-                {
-                    "艇番": f"{r['pit_no']}号艇",
-                    "1着率": float(stats.get("win_1st_rate", 0.0)),
-                    "2着率": float(stats.get("win_2nd_rate", 0.0)),
-                    "3着率": float(stats.get("win_3rd_rate", 0.0)),
-                    "3連対率": float(stats.get("win_3in_rate", 0.0)),
-                }
-            )
-
-        df_course_stats = pd.DataFrame(course_stats_rows)
-
-        def highlight_green_gradient(df: pd.DataFrame) -> pd.DataFrame:
-            styles = pd.DataFrame("", index=df.index, columns=df.columns)
-
-            green_colors = [
-                "background-color: #2e7d32; color: #ffffff; font-weight: bold;",
-                "background-color: #4caf50; color: #ffffff; font-weight: bold;",
-                "background-color: #81c784; color: #000000; font-weight: bold;",
-                "background-color: #a5d6a7; color: #000000;",
-                "background-color: #c8e6c9; color: #000000;",
-                "background-color: #e8f5e9; color: #000000;",
-            ]
-
-            target_cols = ["1着率", "2着率", "3着率", "3連対率"]
-            for col in target_cols:
-                if col in df.columns:
-                    unique_vals = sorted(df[col].dropna().unique(), reverse=True)
-                    for idx, val in df[col].items():
-                        if val in unique_vals:
-                            rank_idx = unique_vals.index(val)
-                            if rank_idx < len(green_colors):
-                                styles.loc[idx, col] = green_colors[rank_idx]
-
-            return styles
-
-        styled_course_df = (
-            df_course_stats.style
-            .format({
-                "1着率": "{:.1f}%",
-                "2着率": "{:.1f}%",
-                "3着率": "{:.1f}%",
-                "3連対率": "{:.1f}%",
-            })
-            .apply(highlight_green_gradient, axis=None)
-        )
-
-        st.dataframe(styled_course_df, use_container_width=True, hide_index=True)
-
-    except Exception as e:
-        st.error(f"計算エラーが発生しました: {e}")
+        except Exception as e:
+            st.error(f"予測処理中にエラーが発生しました: {e}")
+            st.exception(e)
