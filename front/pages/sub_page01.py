@@ -350,7 +350,7 @@ if parsed_data and "event" in parsed_data and "venues" in parsed_data["event"]:
                     "全国\t" + "\t".join(national_wins),
                     "当地\t" + "\t".join(local_wins)
                 ]
-                formatted_copy_text = "\n".join(copy_rows)
+                formatted_copy_text = "\n".join(copy_rows) + "\n"
 
                 st.text_area("以下をコピーしてご利用ください", value=formatted_copy_text, height=140, key="copy_text_area")
 
