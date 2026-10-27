@@ -109,11 +109,30 @@ def generate_final_betting_recommendation(
 
     elif "差し" in primary_dev:
         sashi_pit = 2 if "2コース" in primary_dev else 4
-        recommended_bets = [
-            {"bet": f"{sashi_pit}-1-全", "weight": 60},
-            {"bet": f"{sashi_pit}-3-全", "weight": 20},
-            {"bet": f"{sashi_pit}-4-全", "weight": 20},
-        ]
+        if sashi_pit == 4:
+            # 【4コース差し】4-125-全 のフォーメーション構築
+            p2_candidates = [1, 2, 5]
+            raw_combinations = []
+            for p2 in p2_candidates:
+                for p3 in range(1, 7):
+                    if p3 != 4 and p3 != p2:
+                        raw_combinations.append((4, p2, p3))
+
+            total_combos = len(raw_combinations)
+            if total_combos > 0:
+                weight_per_bet = round(100 / total_combos, 1)
+                for c in raw_combinations:
+                    recommended_bets.append({
+                        "bet": f"{c[0]}-{c[1]}-{c[2]}",
+                        "weight": weight_per_bet
+                    })
+        else:
+            # 2コース差しなどの従来処理
+            recommended_bets = [
+                {"bet": f"{sashi_pit}-1-全", "weight": 60},
+                {"bet": f"{sashi_pit}-3-全", "weight": 20},
+                {"bet": f"{sashi_pit}-4-全", "weight": 20},
+            ]
 
     else:
         # 混戦・判定なし（上位スコア組）
