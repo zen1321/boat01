@@ -212,10 +212,10 @@ def parse_kyotei_txt_fixed(text_content: str) -> dict:
 
 # --- UIコンポーネント ---
 
-# メイン画面へ戻るボタン
+# --- メイン予測画面への遷移ボタン ---
 col_nav, _ = st.columns([2, 8])
 with col_nav:
-    if st.button("⬅️ メイン予測画面へ戻る", use_container_width=True):
+    if st.button("👉 総合スコア予測画面へ移動", type="primary", use_container_width=True):
         st.switch_page("pages/main_page.py")
 
 st.markdown("---")

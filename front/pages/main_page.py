@@ -15,15 +15,14 @@ from data.venue_repository import get_all_venues
 from logic.betting_decision import generate_final_betting_recommendation
 from logic.main_logic import calculate_full_race_scores
 
-# --- タイトル ＆ 新画面への遷移ボタン ---
-# （main_page.py の冒頭部分）
+# --- タイトル ＆ 管理画面への戻るボタン ---
 st.title("🚤 ボートレース総合スコア予測")
 
 col_head1, col_head2 = st.columns([7, 3])
 with col_head1:
     st.caption("Webサイトからデータを貼り付けて表に反映し、スコアと順位・買い目を算出します。")
 with col_head2:
-    if st.button("⚙️ サブ機能01画面へ移動", type="secondary", use_container_width=True):
+    if st.button("⬅️ 番組データ管理画面へ戻る", type="secondary", use_container_width=True):
         st.switch_page("pages/sub_page01.py")
 
 st.markdown("---")
